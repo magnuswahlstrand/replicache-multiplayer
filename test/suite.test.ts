@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, it} from 'vitest'
 import {createSpace, getSpaceVersion, setSpaceVersion} from "@/db/spaces";
 import {dbWithTx} from "@/db";
-import {replicacheClients, spaces} from "@/db/schema";
+import {entities, replicacheClients, spaces} from "@/db/schema";
 import {processMutation} from "@/lib/mutation";
 import {getLastMutationID} from "@/db/replicache-clients";
 
@@ -11,6 +11,7 @@ const TEST_CLIENT = 'TEST_CLIENT_ID';
 describe('spaces', () => {
     beforeEach(async () => {
         await dbWithTx(async tx => {
+            await tx.delete(entities).execute()
             await tx.delete(spaces).execute()
             await createSpace(tx, TEST_SPACE_ID)
         })
@@ -36,6 +37,7 @@ describe('spaces', () => {
 describe('replicache client', () => {
     beforeEach(async () => {
         await dbWithTx(async tx => {
+            await tx.delete(entities).execute()
             await tx.delete(replicacheClients).execute()
         })
     })
@@ -56,6 +58,7 @@ describe('replicache client', () => {
 describe('process mutation', () => {
     beforeEach(async () => {
         await dbWithTx(async tx => {
+            await tx.delete(entities).execute()
             await tx.delete(spaces).execute()
             await createSpace(tx, TEST_SPACE_ID)
         })
@@ -63,10 +66,25 @@ describe('process mutation', () => {
 
     it('add mutations bumps space version', async () => {
         await dbWithTx(async tx => {
-            await processMutation(tx, TEST_CLIENT, TEST_SPACE_ID, {id: 1, name: 'createMessage'})
+            await processMutation(tx, TEST_CLIENT, TEST_SPACE_ID, {
+                id: 1,
+                name: 'updateUser',
+                args: {id: '12', name: 'Magnus', icon: '🦁'},
+                timestamp: 0
+            })
 
-            const version = await getSpaceVersion(tx, TEST_SPACE_ID)
+            let version = await getSpaceVersion(tx, TEST_SPACE_ID)
             expect(version).eq(1)
+
+            await processMutation(tx, TEST_CLIENT, TEST_SPACE_ID, {
+                id: 2,
+                name: 'updateUser',
+                args: {id: '12', name: 'Magnus', icon: '🦁'},
+                timestamp: 0
+            })
+
+            version = await getSpaceVersion(tx, TEST_SPACE_ID)
+            expect(version).eq(2)
         })
     })
 })
